@@ -7,6 +7,7 @@ from pandas.io.json import json_normalize
 from pandas.api.types import is_string_dtype
 from pandas.api.types import is_numeric_dtype
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 ## Create the class with all the pertinent paramaters
 class cryptocompareAPI(object):
@@ -112,7 +113,7 @@ class cryptocompareAPI(object):
         df['index_values'] = (df['index_returns']+1).cumprod()
         return df
 
-    def get_coin_volatility(self, base_list, window, period, periods_back, plot="Yes"):
+    def get_coin_volatility(self, base_list, window, period, periods_back, plot=True):
         data = self.get_multiple_currencies(base_list, period, periods_back)
         i = 0
         for column in data:
@@ -120,14 +121,28 @@ class cryptocompareAPI(object):
                 data[column] = data[column].pct_change().rolling(window).std()*(365**0.5)
                 data.rename(columns={column: base_list[i] + '_vol'}, inplace=True)
                 i+=1
-        data.plot(x='time')
-        plt.title('{}D Annualized Volatility of Selected Coins'.format(window))
-        plt.show()
+        if(plot):
+            data.plot(x='time')
+            plt.title('{}D Annualized Volatility of Selected Coins'.format(window))
+            plt.show()
         return data
 
-    def get_correlation_data(self, coin_list, start_date, end_date, correlation_periods):
-        return
+    def get_correlation_data(self, base_list, window, period, periods_back, plot=True):
+        data = self.get_multiple_currencies(base_list, period, periods_back)
+        i = 0
+        for column in data:
+            if(is_numeric_dtype(data[column])):
+                data.rename(columns={column: base_list[i]}, inplace=True)
+                i+=1
+        Var_Corr = data.corr()
+        sns.heatmap(Var_Corr, xticklabels=Var_Corr.columns, yticklabels=Var_Corr.columns, annot=True)
+        plt.title('{}D Correlations of Selected Coins'.format(periods_back))
+        plt.show()
+        return Var_Corr
 
+    def get_sharpe_ratio(self, ):
+
+        return
 
 
 
@@ -140,7 +155,7 @@ class cryptocompareAPI(object):
 if __name__ == '__main__':
     api_key = '60a704b50ae660f09c6e053b1a5fa8027e95d145b3f21061e359d1cb185c5fe4'
     cryptocompare = cryptocompareAPI(api_key)
-    print(cryptocompare.get_coin_volatility(['BTC','ETH', 'XRP', 'XTZ', 'BCH'], 60, '1d', 365))
+    print(cryptocompare.get_correlation_data(['BTC','ETH', 'XRP', 'DCR'], 60, '1d', 365))
 
 
 
