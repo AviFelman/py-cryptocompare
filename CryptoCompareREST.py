@@ -1,39 +1,52 @@
-## Programming the CryptoCompare API Calls
-
-# First -- I want to be able to construct the URL needed
+## Import all the of the necessary repositories for usage.
 import pandas as pd
 import numpy as np
 import requests
 from datetime import datetime
 from pandas.io.json import json_normalize
-import matplotlib as plt
 
+
+
+## Create the class with all the pertinent paramaters
 class cryptocompareAPI(object):
     def __init__(self, key):
         self.url = 'https://min-api.cryptocompare.com/data/'
         self.key = key
 
-    def request(self, action):
-        headers = {'authorization': 'Apikey %s' % (api_key)}
-        response = requests.get(self.url + action, headers=headers)
-        # Catching errors
+    ## Create a helper function for performing requests.
+    ## In almost no situation will you need to call the API and access the non-json data
+    def request(self, action, params):
+        headers = {'authorization': 'Apikey %s' % (self.key)}
+        response = requests.get(self.url + action, headers=headers, params=params)
+        print(response.url)
+        # Raise exceptions if something goes wrong with the API or a specific call.
         if self.key is None:
             raise Exception('API key is empty')
         if response.status_code != 200:
             raise Exception("Error: " + str(response.status_code) + "\n" + response.text + "\nRequest: " + response.url)
-
         json = response.json()
         return json
 
-    def get_raw_price_data(self, currency, days_back, additional_information=False):
-        action = 'histoday?fsym={}&tsym=USD&limit={}'.format(currency, days_back)
-        data = self.request(action)
+    # Get a single currency -- currenct pricing
+    def get_single_currency_price(self, base, quote_list):
+        action = 'price'
+        params =  {'fsym': base, 'tsyms': quote_list}
+        data = self.request(action, params)
+        return data
 
-        if(additional_information):
-            return data
+    def get_single_currency_history(self, base, quote, period, periods_back):
+        ## Determine the correct period
+        if(period == 'daily'):
+            action = 'v2/histoday'
+        elif(period == 'hour'):
+            action = 'v2/histohour'
+        else:
+            action = 'v2/histominute'
+        params = {'fsym': base, 'tsym': quote, 'limit': periods_back}
+        data = self.request(action, params)
         return data['Data']
 
-    def get_open_history(self, currency, days_back):
+    def price_to_dataframe(self, currency, days_back):
         new_header = currency + "_Open"
         data = json_normalize(self.get_raw_price_data(currency, days_back))
         data['time'] = data['time'].apply(lambda x: datetime.utcfromtimestamp(x).strftime('%Y-%m-%d'))
@@ -90,20 +103,13 @@ class cryptocompareAPI(object):
 
 if __name__ == '__main__':
     api_key = '60a704b50ae660f09c6e053b1a5fa8027e95d145b3f21061e359d1cb185c5fe4'
-    CryptoCompare = cryptocompareAPI(api_key)
-    #june = ['BTC','ETH','XRP','BCH','EOS','LTC','BNB','BSV','XLM','ADA','TRX','MIOTA','ATOM','XTZ','ETC','NEO','XEM','MKR','BTG']
-    #july = ['BTC','XRP','ETH','BCH','EOS','XLM','LTC','BSV','TRX','ADA','MIOTA','BNB','XEM','ETC','NEO','MKR','WAVES','XTZ','DOGE','BTG']
-    #august = ['BTC','XRP','ETH','BCH','EOS','XLM','LTC','BSV','TRX','ADA','MIOTA','BNB','XEM','ETC','NEO','MKR','WAVES','XTZ','DOGE','BTG']
-
-    #june_weights = [0.622,0.116,0.076,0.032,0.029,0.029,0.019,0.015,0.011,0.009,0.009,0.006,0.005,0.004,0.004,0.003,0.003,0.003,0.003,0.002]
-    #july_weights = [0.684,0.11,0.06,0.027,0.025,0.019,0.016,0.008,0.008,0.007,0.006,0.004,0.004,0.004,0.004,0.003,0.003,0.003,0.002,0.002]
-    #august_weights = [0.72,0.091,0.053,0.024,0.023,0.017,0.016,0.01,0.006,0.006,0.006,0.005,0.004,0.003,0.003,0.003,0.003,0.003,0.002,0.002]
-
+    cryptocompare = cryptocompareAPI(api_key)
+    print(cryptocompare.get_single_currency_price('BTC', ['EUR', 'USD']))
     #exchange = CryptoCompare.get_exchange_data(['Binance', 'Coinbase', 'BitMEX', 'Bitfinex'], 100)
 
 
     #data = CryptoCompare.get_multiple_currencies(['BTC', 'ETH'], 1000)
-    data = CryptoCompare.get_multiple_currencies(['BTC'], 1200)
+    #data = CryptoCompare.get_multiple_currencies(['BTC'], 1200)
     #return_data = CryptoCompare.index_data(august_weights, data)
     #index_data = return_data['time', 'index_values']
     #data.to_csv("index_data_january.csv")
