@@ -140,17 +140,6 @@ class cryptocompareAPI(object):
         plt.show()
         return Var_Corr
 
-    def get_sharpe_ratio(self, ):
-
-        return
-
-
-
-
-    # Each other endpoint will have URL specific endpoints.
-    # First one should be just gathering
-
-
 
 if __name__ == '__main__':
     api_key = ''
