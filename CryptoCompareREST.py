@@ -153,7 +153,7 @@ class cryptocompareAPI(object):
 
 
 if __name__ == '__main__':
-    api_key = '60a704b50ae660f09c6e053b1a5fa8027e95d145b3f21061e359d1cb185c5fe4'
+    api_key = ''
     cryptocompare = cryptocompareAPI(api_key)
     print(cryptocompare.get_correlation_data(['BTC','ETH', 'XRP', 'DCR'], 60, '1d', 365))
 
