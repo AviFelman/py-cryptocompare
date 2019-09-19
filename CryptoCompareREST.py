@@ -71,13 +71,13 @@ class cryptocompareAPI(object):
         return data[['time', new_header]]
 
     # Note that this uses the opening price of any day put into the function
-    def get_multiple_currencies(self, base_list, period, periods_back,quote='USD',include_returns=None):
+    def get_currency_prices(self, currency_list, period, periods_back,quote='USD',include_returns=None):
         dataframe_final = pd.DataFrame()
 
         ## Loop for creating the DataFrame
-        for currency in base_list:
+        for currency in currency_list:
             new_header = currency + "_open"
-            if(currency == base_list[0]):
+            if(currency == currency_list[0]):
                 dataframe_final = self.helper_open_price_to_dataframe(currency, period, periods_back)
             else:
                 dataframe_final[new_header] = self.helper_open_price_to_dataframe(currency, period, periods_back)[new_header]
@@ -113,13 +113,14 @@ class cryptocompareAPI(object):
         df['index_values'] = (df['index_returns']+1).cumprod()
         return df
 
-    def get_coin_volatility(self, base_list, window, period, periods_back, plot=True):
-        data = self.get_multiple_currencies(base_list, period, periods_back)
+    # This function generates a dataframe with historical volatility of all coins. If plot = True, it will generate a nice graph to go along.
+    def get_coin_volatility(self, currency_list, window, period, periods_back, plot=False):
+        data = self.get_currency_prices(currency_list, period, periods_back)
         i = 0
         for column in data:
             if(is_numeric_dtype(data[column])):
                 data[column] = data[column].pct_change().rolling(window).std()*(365**0.5)
-                data.rename(columns={column: base_list[i] + '_vol'}, inplace=True)
+                data.rename(columns={column: currency_list[i] + '_vol'}, inplace=True)
                 i+=1
         if(plot):
             data.plot(x='time')
@@ -127,36 +128,27 @@ class cryptocompareAPI(object):
             plt.show()
         return data
 
-    def get_correlation_data(self, base_list, window, period, periods_back, plot=True):
-        data = self.get_multiple_currencies(base_list, period, periods_back)
+    # This function allows you to inset any list of currencies, and print a table of correlation data
+    # As part of the function, Seaborn is included to create a nice looking graph. If you would like the graph, set plot = True.
+    def get_correlation_matrix(self, currency_list, period, periods_back, plot=False):
+        data = self.get_currency_prices(currency_list, period, periods_back)
         i = 0
         for column in data:
             if(is_numeric_dtype(data[column])):
-                data.rename(columns={column: base_list[i]}, inplace=True)
+                data.rename(columns={column: currency_list[i]}, inplace=True)
                 i+=1
-        Var_Corr = data.corr()
-        sns.heatmap(Var_Corr, xticklabels=Var_Corr.columns, yticklabels=Var_Corr.columns, annot=True)
-        plt.title('{}D Correlations of Selected Coins'.format(periods_back))
-        plt.show()
-        return Var_Corr
+        # Returns correlation matrix object
+        correlation_object = data.corr()
+
+        # Plotting the correlation object
+        if(plot):
+            sns.heatmap(Var_Corr, xticklabels=Var_Corr.columns, yticklabels=Var_Corr.columns, annot=True)
+            plt.title('{}D Correlations of Selected Coins'.format(periods_back))
+            plt.show()
+        return correlation_object
 
 
 if __name__ == '__main__':
     api_key = ''
     cryptocompare = cryptocompareAPI(api_key)
-    print(cryptocompare.get_correlation_data(['BTC','ETH', 'XRP', 'DCR'], 60, '1d', 365))
-
-
-
-
-
-
-    #exchange = cryptocompare.get_exchange_data(['Binance', 'Coinbase', 'BitMEX', 'Bitfinex'], 100)
-
-    #print(exchange)
-    #data = CryptoCompare.get_multiple_currencies(['BTC', 'ETH'], 1000)
-    #data = CryptoCompare.get_multiple_currencies(['BTC'], 1200)
-    #return_data = CryptoCompare.index_data(august_weights, data)
-    #index_data = return_data['time', 'index_values']
-    #data.to_csv("index_data_january.csv")
-    #print(data)
+    print(cryptocompare.get_correlation_data(['BTC','ETH', 'XRP', 'DCR', 'BCH', 'REP', 'HOT'], '1d', 365))
