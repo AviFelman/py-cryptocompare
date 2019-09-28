@@ -86,7 +86,10 @@ class cryptocompareAPI(object):
                 dataframe_final[currency + "_return"] = dataframe_final[new_header].pct_change()
         return dataframe_final
 
-    def get_exchange_data(self, exchange_list, periods_back, quote='USD'):
+    # Returns a dataframe with exchanges and their respective volume graphs.
+    # If you would like volumes to be averaged over a period of time to reduce noise, just change average to a int() of your choosing (7, 14, 21, etc)
+    # If you would like to show a marketshare graph, change the parameter, percentages to True.
+    def get_exchange_data(self, exchange_list, periods_back, quote='USD', average=None, percentages=False, plot=False):
         dataframe_final = pd.DataFrame()
         action = "exchange/histoday"
 
@@ -101,6 +104,16 @@ class cryptocompareAPI(object):
                 dataframe_final[new_header] = json_normalize(self.request(action, params)["Data"])['volume']
 
         dataframe_final['time'] = self.utc_to_datetime(dataframe_final['time'], '1d')
+        dataframe_final.set_index('time', inplace=True)
+
+        if average is not None:
+            dataframe_final = dataframe_final.rolling(window=average).mean()
+
+        if(plot):
+            dataframe_final.plot()
+            plt.title('{}D Moving Average of Exchange Volumes'.format(average))
+            plt.show()
+
         return dataframe_final
 
     def index_data(self, weights, price_data):
@@ -142,7 +155,7 @@ class cryptocompareAPI(object):
 
         # Plotting the correlation object
         if(plot):
-            sns.heatmap(Var_Corr, xticklabels=Var_Corr.columns, yticklabels=Var_Corr.columns, annot=True)
+            sns.heatmap(correlation_object, xticklabels=correlation_object.columns, yticklabels=correlation_object.columns, annot=True)
             plt.title('{}D Correlations of Selected Coins'.format(periods_back))
             plt.show()
         return correlation_object
@@ -151,4 +164,7 @@ class cryptocompareAPI(object):
 if __name__ == '__main__':
     api_key = ''
     cryptocompare = cryptocompareAPI(api_key)
-    print(cryptocompare.get_correlation_data(['BTC','ETH', 'XRP', 'DCR', 'BCH', 'REP', 'HOT'], '1d', 365))
+
+    ## Change list names to get different exchanges. Change 365 --> will change the amount of days back the data pulls.
+    # changing average will change the moving average calculation (14 day moving average of volume to reduce spikes and spot a trend)
+    cryptocompare.get_correlation_matrix(['BTC', 'ETH', 'XRP', 'ETC', 'TRX'], '1d', 365, plot=True)
