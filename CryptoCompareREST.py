@@ -1,5 +1,6 @@
 """
 This API wrapper is meant to be used to access and use the CryptoCompare API in an easy to use manner.
+It is meant to be used with the free cryptocompare API
 """
 
 import requests
