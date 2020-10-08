@@ -1,23 +1,27 @@
 """
-This API wrapper is meant to be used to access and use the CryptoCompare API in an easy to use manner.
-It is meant to be used with the free cryptocompare API
+This API wrapper is useful for gathering basic pricing information from the CryptoCompare API
+There are a variety of transforms that are likely helpful for traders. 
+
+Created by: @avifelman
+Last Updated: Oct 8th, 2020 
 """
 
 import requests
 from datetime import date, datetime
 import calendar
-from pandas.io.json import json_normalize
 from pandas.api.types import is_numeric_dtype
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import math
 from scipy import stats
+import numpy as np
 
-plt.style.use('fivethirtyeight')
+# For style purposes
+plt.style.use('ggplot')
 
 
-# General function for usage within the class
+# Helper Function
 def utc_to_datetime(df, formatting):
     if formatting == 'D':
         df_new = df.apply(lambda x: datetime.utcfromtimestamp(x).strftime('%Y-%m-%d'))
@@ -25,9 +29,8 @@ def utc_to_datetime(df, formatting):
         df_new = df.apply(lambda x: datetime.utcfromtimestamp(x).strftime('%Y-%m-%d %H:%S'))
     return df_new
 
-
 # Create the class with all the pertinent parameters
-class CryptoCompareAPI(object):
+class CryptoCompareAPI:
     def __init__(self, key):
         self.url = 'https://min-api.cryptocompare.com/data/'
         self.key = key
@@ -114,9 +117,13 @@ class CryptoCompareAPI(object):
         return df_main
 
     # This uses the opening price of currencies to create a DataFrame that contains the prices of many currencies
-    # As opposed to more information about a specific currency like the get_currency_history function.
+    # As opposed to more information about a specific currency like the get_currency_history function
     def get_multiple_currency_prices(self, currency_list, period, date_from, date_to, quote='USD', exchange='CCCAGG',
                                      returns=False, price='open'):
+        
+        if not isinstance(currency_list, list): 
+            currency_list = [currency_list]
+            
         df = pd.DataFrame()
         # Loop through all currencies in your currency list, to generate a DataFrame of multiple currencies.
         for currency in currency_list:
@@ -126,6 +133,7 @@ class CryptoCompareAPI(object):
                 df[currency] = df[currency].pct_change()[1:]
         return df
 
+    # Returns the Alpha and the Beta of multiple assets against Bitcoin. 
     def get_alpha_beta(self, currency_list, period, date_from, date_to):
         data = self.get_multiple_currency_prices(currency_list, period, date_from, date_to, returns=True)[1:]
         btc_price = self.get_multiple_currency_prices(["BTC"], period, date_from, date_to, returns=True)[1:]
@@ -137,8 +145,9 @@ class CryptoCompareAPI(object):
             df_real = df_real.append(df)
         return df_real
 
-    # This function generates a DataFrame with historical volatility of all coins, and plots accordingly.
-    def get_coin_volatility(self, currency_list, window, period, date_from, date_to):
+    # This function generates a DataFrame with historical volatility of all coins, and plots accordingly. 
+    # Can chart the volatiity of a variety of different assets
+    def get_coin_volatility(self, currency_list, window, period, date_from, date_to, plot=True):
         data = self.get_multiple_currency_prices(currency_list, period, date_from, date_to, returns=True)
         i = 0
         for column in data:
@@ -146,11 +155,13 @@ class CryptoCompareAPI(object):
                 data[column] = data[column].rolling(window).std() * math.sqrt(365)
                 data.rename(columns={column: currency_list[i] + '_vol'}, inplace=True)
                 i += 1
-        data.dropna().plot()
-        plt.title('{}{} Realized Volatility of Selected Coins'.format(window, period))
-        plt.show()
+        if plot:        
+            data.dropna().plot(linewidth=2.0)
+            plt.title('{}{} Realized Volatility of Selected Coins'.format(window, period))
+            plt.show()
         return data
 
+    # Returns the list of all CryptoCompare assets
     def get_toplist(self, limit):
         action = 'top/totalvolfull'
         params = {'limit': limit, 'tsym': 'USD'}
@@ -160,14 +171,8 @@ class CryptoCompareAPI(object):
             toplist.append(item['CoinInfo']['Name'])
         return toplist
 
-    # TODO: Need to update this function to return the top 5 most correlated assets for any given input
-    def get_top_correls(self, base, date_from, date_to, top):
-        toplist = self.get_toplist(top)
-        data = self.get_multiple_currency_prices(toplist, 'D', date_from, date_to)
-        corr = data.corr()
-        return corr
-
-    def get_correlation_matrix(self, currency_list, period, date_from, date_to, plot=False):
+    # Hopefully self-explanatory
+    def get_correlation_matrix(self, currency_list, period, date_from, date_to, plot=True):
         data = self.get_multiple_currency_prices(currency_list, period, date_from, date_to, returns="Yes")
         i = 0
         for column in data:
@@ -186,13 +191,59 @@ class CryptoCompareAPI(object):
         return correlation_object
 
 
+    # TODO --> Add a function that takes in a specific asset, and then spits out it's top 5 most correlated assets, with a lag included 
+    def get_top_correls(self, asset, lag,  period, date_form, date_to):
+        return None
+
+    # Compares the upside volatility of an asset to the downside volatility of an asset
+    def directional_vol(self, asset, window, period, start_date, end_date):
+        px_data = self.get_currency_history(asset, period, start_date, end_date)
+        px_data['returns'] = px_data['close'].pct_change()
+        px_data = px_data.assign(upside=np.where(px_data.returns > 0, px_data.returns, 0),
+                                 downside=np.where(px_data.returns < 0, px_data.returns, 0))
+        px_data['upside_vol'] = px_data.upside.rolling(window).std()
+        px_data['downside_vol'] = px_data.downside.rolling(window).std(skipna=True)
+        directional = px_data[['downside_vol', 'upside_vol']]
+        fig, axs = plt.subplots(nrows=2, ncols=1)
+        directional.plot(ax=axs[0], linewidth=2.0)
+        px_data['close'].plot(ax=axs[1], linewidth=2.0)
+        plt.show()
+        return px_data
+
+    # Delivers a historical volatility plot and the a graded percentile of volatility (from 0 to 100, every 5%)
+    def vol_desciption(self, asset, window, period, date_from , date_to, graph): 
+        vol = api.get_coin_volatility(asset, window, period, date_from, date_to, plot=graph)
+        index = asset[0] + "_vol"
+        curr_vol = vol[index].iloc[-1]
+        vol_array = np.array([])
+
+        for i in np.linspace(0,1,21): 
+            vol_quantile = vol[index].quantile(i)
+            vol_array = np.append(vol_array, vol_quantile)
+
+            if curr_vol < vol_quantile and curr_vol > vol_array[len(vol_array)-2]: 
+                print("{}%: {} vol <--- You are here, {} vol".format(round(i*100, 2), round(vol_quantile, 2), round(curr_vol, 2)))
+            else: 
+                print("{}%: {} vol".format(round(i*100, 2), round(vol_quantile, 2)))
+
+
 if __name__ == '__main__':
     api_key = ''
     api = CryptoCompareAPI(api_key)
-
-    date_from = datetime(2020, 5, 1)
+    date_from = datetime(2018, 1, 1)
     date_to = datetime.now()
 
-    df = api.get_alpha_beta(['BTC', 'ETH', 'KNC', 'XTZ', 'LINK'], 'h', date_from, date_to)
-    vol = api.get_coin_volatility(['BTC', 'ETH', 'KNC', 'XTZ', 'LINK'], 7, 'D', date_from, date_to)
-    print(df)
+    #api.vol_desciption('SNX', 7, 'D', date_from, date_to, True)
+
+    # Get Hourly Bitcoin Data going back as long as you want!
+    btc_data = api.get_currency_history('BTC', 'h', date_from, date_to)
+    btc_data.to_csv("hourly_btc_data.csv")
+
+
+    # Example of Correlation Function
+    #   defi_list = ['MKR', 'ETH', 'ZRX', 'REP', 'KNC', 'COMP', 'YFI', 'SOL', 'OMG', 'BNT', 'LINK', 'BAND', 'BAL', 'REN', 'CELR', 'KAVA', 'LEND', 'SNX', 'RUNE', 'ANT']
+    #   api.get_correlation_matrix(curr_list, 'D', date_from, date_to)
+
+  
+
+    
