@@ -29,6 +29,7 @@ def utc_to_datetime(df, formatting):
         df_new = df.apply(lambda x: datetime.utcfromtimestamp(x).strftime('%Y-%m-%d %H:%S'))
     return df_new
 
+
 # Create the class with all the pertinent parameters
 class CryptoCompareAPI:
     def __init__(self, key):
@@ -152,12 +153,14 @@ class CryptoCompareAPI:
         i = 0
         for column in data:
             if is_numeric_dtype(data[column]):
-                data[column] = data[column].rolling(window).std() * math.sqrt(365)
+                data[column] = data[column].rolling(window).std() * math.sqrt(365) * 100
                 data.rename(columns={column: currency_list[i] + '_vol'}, inplace=True)
                 i += 1
         if plot:        
             data.dropna().plot(linewidth=2.0)
             plt.title('{}{} Realized Volatility of Selected Coins'.format(window, period))
+            plt.xticks(rotation=45)
+            plt.ylabel('Volatility (%)')
             plt.show()
         return data
 
@@ -173,7 +176,7 @@ class CryptoCompareAPI:
 
     # Hopefully self-explanatory
     def get_correlation_matrix(self, currency_list, period, date_from, date_to, plot=True):
-        data = self.get_multiple_currency_prices(currency_list, period, date_from, date_to, returns="Yes")
+        data = self.get_multiple_currency_prices(currency_list, period, date_from, date_to, returns=True)
         i = 0
         for column in data:
             if is_numeric_dtype(data[column]):
@@ -190,10 +193,16 @@ class CryptoCompareAPI:
             plt.show()
         return correlation_object
 
-
-    # TODO --> Add a function that takes in a specific asset, and then spits out it's top 5 most correlated assets, with a lag included 
-    def get_top_correls(self, asset, lag,  period, date_form, date_to):
-        return None
+    # TODO --> Add a function that takes in a specific asset, and then spits out it's top 5 most correlated assets,
+    #  with a lag included Requires manual input because of enterprise access
+    def get_top_correls(self, asset, period, date_from, date_to):
+        # need a manual list because of enterprise access
+        currency_list = [asset, 'BTC', 'ETH', 'LINK', 'XRP', 'YFI', 'LTC', 'TRX', 'ZEC', 'ATOM', 'COMP', 'ADA', 'BAND', 'BAL',
+                         'REN', 'CELR', 'KAVA', 'LEND', 'SNX', 'RUNE', 'ANT']
+        data = self.get_multiple_currency_prices(currency_list, period, date_from, date_to, returns=True)
+        data.dropna(inplace=True)
+        corrs = data.corr()
+        return corrs.iloc[0].sort_values(ascending=False)[1:6]
 
     # Compares the upside volatility of an asset to the downside volatility of an asset
     def directional_vol(self, asset, window, period, start_date, end_date):
@@ -211,7 +220,7 @@ class CryptoCompareAPI:
         return px_data
 
     # Delivers a historical volatility plot and the a graded percentile of volatility (from 0 to 100, every 5%)
-    def vol_desciption(self, asset, window, period, date_from , date_to, graph): 
+    def vol_description(self, asset, window, period, date_from , date_to, graph): 
         vol = api.get_coin_volatility(asset, window, period, date_from, date_to, plot=graph)
         index = asset[0] + "_vol"
         curr_vol = vol[index].iloc[-1]
@@ -221,7 +230,7 @@ class CryptoCompareAPI:
             vol_quantile = vol[index].quantile(i)
             vol_array = np.append(vol_array, vol_quantile)
 
-            if curr_vol < vol_quantile and curr_vol > vol_array[len(vol_array)-2]: 
+            if vol_quantile > curr_vol > vol_array[len(vol_array)-2]: 
                 print("{}%: {} vol <--- You are here, {} vol".format(round(i*100, 2), round(vol_quantile, 2), round(curr_vol, 2)))
             else: 
                 print("{}%: {} vol".format(round(i*100, 2), round(vol_quantile, 2)))
@@ -233,11 +242,17 @@ if __name__ == '__main__':
     date_from = datetime(2018, 1, 1)
     date_to = datetime.now()
 
-    #api.vol_desciption('SNX', 7, 'D', date_from, date_to, True)
+
+    top_currencies = api.get_top_correls('LEND', period='D', date_from=date_from, date_to=date_to)
+    print(top_currencies)
+
+
+    #api.get_coin_volatility(['BTC'], 30, 'D', date_from, date_to)
+    #api.vol_description('SNX', 7, 'D', date_from, date_to, True)
 
     # Get Hourly Bitcoin Data going back as long as you want!
-    btc_data = api.get_currency_history('BTC', 'h', date_from, date_to)
-    btc_data.to_csv("hourly_btc_data.csv")
+    #btc_data = api.get_currency_history('BTC', 'h', date_from, date_to)
+    #btc_data.to_csv("hourly_btc_data.csv")
 
 
     # Example of Correlation Function
