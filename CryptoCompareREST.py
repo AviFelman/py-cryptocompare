@@ -63,7 +63,7 @@ class CryptoCompareAPI:
                 action = 'v2/histominute'
             else:
                 print("Invalid interval")
-            params = {'fsym': base, 'tsym': quote, 'limit': 2000, 'toTs': date_to, 'e': exchange}
+            params = {'fsym': base, 'tsym': quote, 'limit': 20, 'toTs': date_to, 'e': exchange}
             data = self.request(action, params)
             return data['Data']
 
@@ -195,14 +195,26 @@ class CryptoCompareAPI:
 
     # TODO --> Add a function that takes in a specific asset, and then spits out it's top 5 most correlated assets,
     #  with a lag included Requires manual input because of enterprise access
-    def get_top_correls(self, asset, period, date_from, date_to):
+    def get_top_correls(self, asset, period, date_from, date_to, lag=0):
         # need a manual list because of enterprise access
-        currency_list = [asset, 'BTC', 'ETH', 'LINK', 'XRP', 'YFI', 'LTC', 'TRX', 'ZEC', 'ATOM', 'COMP', 'ADA', 'BAND', 'BAL',
-                         'REN', 'CELR', 'KAVA', 'LEND', 'SNX', 'RUNE', 'ANT']
-        data = self.get_multiple_currency_prices(currency_list, period, date_from, date_to, returns=True)
-        data.dropna(inplace=True)
-        corrs = data.corr()
-        return corrs.iloc[0].sort_values(ascending=False)[1:6]
+        
+        if(lag > 0): 
+            currency_list = ['BTC', 'ETH', 'LINK', 'XRP', 'YFI', 'LTC', 'TRX', 'ZEC', 'ATOM', 'COMP', 'ADA', 'BAND', 'BAL', 'REN', 'CELR', 'KAVA', 'SNX', 'RUNE', 'ANT']
+            asset_px = self.get_multiple_currency_prices([asset], period, date_from, date_to, returns=True)[:-lag].reset_index().drop(columns='time')
+            data = self.get_multiple_currency_prices(currency_list, period, date_from, date_to, returns=True)[lag:].reset_index().drop(columns='time')
+            print(asset_px)
+            print(data)
+            df = asset_px.join(data, how='left')
+            print(df)
+            corrs = df.corr()
+            return corrs.iloc[0].sort_values(ascending=False)[1:6]
+        
+        else: 
+            currency_list = [asset, 'BTC', 'ETH', 'LINK', 'XRP', 'YFI', 'LTC', 'TRX', 'ZEC', 'ATOM', 'COMP', 'ADA', 'BAND', 'BAL','REN', 'CELR', 'KAVA', 'SNX', 'RUNE', 'ANT']
+            data = self.get_multiple_currency_prices(currency_list, period, date_from, date_to, returns=True)
+            data.dropna(inplace=True)
+            corrs = data.corr()
+            return corrs.iloc[0].sort_values(ascending=False)[1:6]
 
     # Compares the upside volatility of an asset to the downside volatility of an asset
     def directional_vol(self, asset, window, period, start_date, end_date):
@@ -239,11 +251,11 @@ class CryptoCompareAPI:
 if __name__ == '__main__':
     api_key = ''
     api = CryptoCompareAPI(api_key)
-    date_from = datetime(2018, 1, 1)
+    date_from = datetime(2020, 10, 1)
     date_to = datetime.now()
+    
 
-
-    top_currencies = api.get_top_correls('LEND', period='D', date_from=date_from, date_to=date_to)
+    top_currencies = api.get_top_correls('LEND', period='D', date_from=date_from, date_to=date_to, lag=0)
     print(top_currencies)
 
 
@@ -256,8 +268,8 @@ if __name__ == '__main__':
 
 
     # Example of Correlation Function
-    #   defi_list = ['MKR', 'ETH', 'ZRX', 'REP', 'KNC', 'COMP', 'YFI', 'SOL', 'OMG', 'BNT', 'LINK', 'BAND', 'BAL', 'REN', 'CELR', 'KAVA', 'LEND', 'SNX', 'RUNE', 'ANT']
-    #   api.get_correlation_matrix(curr_list, 'D', date_from, date_to)
+    #defi_list = ['MKR', 'ETH', 'ZRX', 'REP', 'KNC', 'COMP', 'YFI', 'SOL', 'OMG', 'BNT', 'LINK', 'BAND', 'BAL', 'REN', 'CELR', 'KAVA', 'LEND', 'SNX', 'RUNE', 'ANT']
+    #api.get_correlation_matrix(curr_list, 'D', date_from, date_to)
 
   
 
