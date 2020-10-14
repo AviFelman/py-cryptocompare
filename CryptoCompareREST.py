@@ -63,7 +63,7 @@ class CryptoCompareAPI:
                 action = 'v2/histominute'
             else:
                 print("Invalid interval")
-            params = {'fsym': base, 'tsym': quote, 'limit': 20, 'toTs': date_to, 'e': exchange}
+            params = {'fsym': base, 'tsym': quote, 'limit': 2000, 'toTs': date_to, 'e': exchange}
             data = self.request(action, params)
             return data['Data']
 
